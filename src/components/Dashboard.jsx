@@ -1,6 +1,11 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { supabase } from "../supabaseClient";
-import { motion, AnimatePresence } from "framer-motion";
+import {
+  motion,
+  AnimatePresence,
+  useMotionValue,
+  useSpring,
+} from "framer-motion";
 import {
   LogOut,
   Battery,
@@ -18,6 +23,118 @@ import Inventory from "./Inventory";
 import Sales from "./Sales";
 import Service from "./Service";
 import AdminPanel from "./AdminPanel";
+
+const BTN = 48,
+  GAP = 4,
+  PAD = 8,
+  STEP = BTN + GAP;
+const restX = (i) => PAD + i * STEP;
+
+function PillNav({ tabs, activeTab, onSelect }) {
+  const activeIndex = Math.max(
+    0,
+    tabs.findIndex((t) => t.id === activeTab),
+  );
+  const last = Math.max(0, tabs.length - 1);
+  const minX = restX(0);
+  const maxX = restX(last);
+
+  const containerRef = useRef(null);
+  const dragging = useRef(false);
+  const moved = useRef(false);
+  const downX = useRef(0);
+  const [hover, setHover] = useState(activeIndex);
+
+  const xRaw = useMotionValue(restX(activeIndex));
+  const x = useSpring(xRaw, { stiffness: 350, damping: 32, mass: 0.8 });
+  const scaleRaw = useMotionValue(1);
+  const scale = useSpring(scaleRaw, { stiffness: 500, damping: 24 });
+
+  useEffect(() => {
+    if (!dragging.current) xRaw.set(restX(activeIndex));
+  }, [activeIndex]);
+
+  const indexFromClientX = (clientX) => {
+    const rect = containerRef.current.getBoundingClientRect();
+    const raw = Math.min(maxX, Math.max(minX, clientX - rect.left - BTN / 2));
+    return Math.min(last, Math.max(0, Math.round((raw - PAD) / STEP)));
+  };
+
+  const onPointerDown = (e) => {
+    dragging.current = true;
+    moved.current = false;
+    downX.current = e.clientX;
+    containerRef.current?.setPointerCapture(e.pointerId);
+    const idx = indexFromClientX(e.clientX);
+    setHover(idx);
+    xRaw.set(restX(idx));
+    scaleRaw.set(1.12);
+  };
+
+  const onPointerMove = (e) => {
+    if (!dragging.current) return;
+    if (!moved.current && Math.abs(e.clientX - downX.current) > 5)
+      moved.current = true;
+    if (!moved.current) return;
+    const rect = containerRef.current.getBoundingClientRect();
+    const raw = Math.min(maxX, Math.max(minX, e.clientX - rect.left - BTN / 2));
+    xRaw.set(raw);
+    setHover(Math.min(last, Math.max(0, Math.round((raw - PAD) / STEP))));
+  };
+
+  const endDrag = (e) => {
+    if (!dragging.current) return;
+    dragging.current = false;
+    scaleRaw.set(1);
+    const target = moved.current ? hover : indexFromClientX(e.clientX);
+    xRaw.set(restX(target));
+    setHover(target);
+    onSelect(tabs[target].id);
+    try {
+      containerRef.current?.releasePointerCapture(e.pointerId);
+    } catch {}
+  };
+
+  const litIndex = dragging.current ? hover : activeIndex;
+
+  return (
+    <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 md:hidden">
+      <div
+        ref={containerRef}
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={endDrag}
+        onPointerCancel={endDrag}
+        style={{ touchAction: "none" }}
+        className="relative flex items-center gap-1 rounded-full bg-[var(--card)] border border-[var(--card-border)] shadow-lg px-2 py-2 select-none"
+      >
+        <motion.span
+          aria-hidden="true"
+          style={{ x, scale }}
+          className="pointer-events-none absolute top-2 left-0 w-12 h-12 rounded-full bg-zinc-900 dark:bg-white shadow-md will-change-transform"
+        />
+        {tabs.map((tab, i) => (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => onSelect(tab.id)}
+            aria-label={tab.name}
+            aria-current={activeTab === tab.id ? "page" : undefined}
+            className="relative z-10 flex items-center justify-center w-12 h-12 rounded-full"
+          >
+            <tab.icon
+              className={`w-5 h-5 transition-colors duration-200 ${
+                litIndex === i
+                  ? "text-white dark:text-zinc-900"
+                  : "text-zinc-400 dark:text-zinc-500"
+              }`}
+            />
+          </button>
+        ))}
+      </div>
+    </nav>
+  );
+}
 
 export default function Dashboard() {
   const [activeTab, setActiveTab] = useState("home");
@@ -166,20 +283,7 @@ export default function Dashboard() {
         </AnimatePresence>
       </main>
 
-      {/* Mobile floating pill nav */}
-      <nav className="fixed bottom-6 left-1/2 -translate-x-1/2 z-40 md:hidden">
-        <div className="flex items-center gap-1 rounded-full bg-[var(--card)] border border-[var(--card-border)] shadow-lg px-2 py-2">
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              className={`flex items-center justify-center w-12 h-12 rounded-full transition-colors ${activeTab === tab.id ? "bg-zinc-900 text-white dark:bg-white dark:text-zinc-900" : "text-zinc-500 dark:text-zinc-400"}`}
-            >
-              <tab.icon className="w-5 h-5" />
-            </button>
-          ))}
-        </div>
-      </nav>
+      <PillNav tabs={tabs} activeTab={activeTab} onSelect={setActiveTab} />
     </div>
   );
 }
