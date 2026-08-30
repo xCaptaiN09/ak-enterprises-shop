@@ -56,17 +56,17 @@ function RangePicker({ period, onChange, onAccent, compact }) {
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
-        className={`flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-bold transition-colors ${btn} ${
-          compact ? "!px-2" : ""
+        className={`flex items-center rounded-full border text-[11px] font-bold transition-colors ${btn} ${
+          compact ? "p-1.5" : "gap-1.5 px-3 py-1.5"
         }`}
       >
         <CalendarRange className="w-3.5 h-3.5" />
         {!compact && <span>{label}</span>}
-        <ChevronDown className="w-3 h-3" />
+        {!compact && <ChevronDown className="w-3 h-3" />}
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full mt-2 z-30 w-44 glass-card rounded-2xl p-2 shadow-xl">
+        <div className="absolute left-0 sm:left-auto sm:right-0 top-full mt-2 z-30 w-40 glass-card rounded-2xl p-2 shadow-xl">
           {PRESETS.map((p) => (
             <button
               key={p.id}
@@ -285,9 +285,11 @@ export default function Overview({ shopName = "" }) {
                 >
                   <div className="flex items-start justify-between gap-1">
                     <div
-                      className={`p-2 rounded-lg md:rounded-xl ${card.bg} w-fit`}
+                      className={`p-1.5 md:p-2 rounded-lg md:rounded-xl ${card.bg} w-fit`}
                     >
-                      <card.icon className={`w-4 h-4 ${card.color}`} />
+                      <card.icon
+                        className={`w-3.5 h-3.5 md:w-4 md:h-4 ${card.color}`}
+                      />
                     </div>
                     {card.picker && (
                       <RangePicker
