@@ -18,6 +18,30 @@ import { toast } from "../utils/toast";
 import MapPicker from "./MapPicker";
 import { generateInvoice } from "../utils/generateInvoice";
 
+function WarrantyChip({ saleDate, months }) {
+  if (!saleDate || months == null) {
+    return (
+      <span className="text-[10px] font-bold px-2 py-0.5 rounded-full border bg-zinc-500/10 text-zinc-500 dark:text-zinc-400 border-zinc-500/20 whitespace-nowrap">
+        No Warranty
+      </span>
+    );
+  }
+  const expiry = new Date(saleDate);
+  expiry.setMonth(expiry.getMonth() + parseInt(months));
+  const active = new Date() <= expiry;
+  return (
+    <span
+      className={`text-[10px] font-bold px-2 py-0.5 rounded-full border whitespace-nowrap ${
+        active
+          ? "bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20"
+          : "bg-red-500/10 text-red-600 dark:text-red-400 border-red-500/20"
+      }`}
+    >
+      {active ? "Active" : "Expired"} • {expiry.toLocaleDateString()}
+    </span>
+  );
+}
+
 export default function Sales({ isAdmin }) {
   const [records, setRecords] = useState([]);
   const [inventory, setInventory] = useState([]);
@@ -578,12 +602,18 @@ export default function Sales({ isAdmin }) {
                                 S/N: {item.serial_number || "N/A"} • HSN:{" "}
                                 {item.hsn_code || "-"}
                               </div>
-                              <div className="text-zinc-500 dark:text-zinc-400 text-xs mt-1">
-                                Vehicle: {item.vehicle_type || "-"} (
-                                {item.vehicle_number || "-"}) • Warranty:{" "}
-                                {item.warranty_months != null
-                                  ? `${item.warranty_months} mo`
-                                  : "-"}
+                              <div className="flex items-end justify-between gap-2 mt-1">
+                                <div className="text-zinc-500 dark:text-zinc-400 text-xs">
+                                  Vehicle: {item.vehicle_type || "-"} (
+                                  {item.vehicle_number || "-"})
+                                  {item.warranty_months != null
+                                    ? ` • ${item.warranty_months} mo`
+                                    : ""}
+                                </div>
+                                <WarrantyChip
+                                  saleDate={sale.sale_date}
+                                  months={item.warranty_months}
+                                />
                               </div>
                             </div>
                           ))}
@@ -619,12 +649,18 @@ export default function Sales({ isAdmin }) {
                             <span className="text-zinc-400 dark:text-zinc-500 uppercase text-xs block mb-1">
                               Warranty Until
                             </span>
-                            <span className="text-zinc-900 dark:text-white">
-                              {calculateExpiry(
-                                sale.sale_date,
-                                sale.warranty_months,
-                              )}
-                            </span>
+                            <div className="flex items-center gap-2">
+                              <span className="text-zinc-900 dark:text-white">
+                                {calculateExpiry(
+                                  sale.sale_date,
+                                  sale.warranty_months,
+                                )}
+                              </span>
+                              <WarrantyChip
+                                saleDate={sale.sale_date}
+                                months={sale.warranty_months}
+                              />
+                            </div>
                           </div>
                         </div>
                       )}
