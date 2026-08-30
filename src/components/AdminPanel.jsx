@@ -9,8 +9,10 @@ export default function AdminPanel() {
     shop_name: "",
     shop_address: "",
     shop_phone: "",
+    shop_email: "",
     shop_gstin: "",
     shop_state: "",
+    shop_pincode: "",
   });
   const [savingSettings, setSavingSettings] = useState(false);
 
@@ -57,8 +59,10 @@ export default function AdminPanel() {
         shop_name: settings.shop_name,
         shop_address: settings.shop_address,
         shop_phone: settings.shop_phone,
+        shop_email: settings.shop_email,
         shop_gstin: settings.shop_gstin,
         shop_state: settings.shop_state,
+        shop_pincode: settings.shop_pincode,
       })
       .eq("id", 1);
 
@@ -127,6 +131,19 @@ export default function AdminPanel() {
           </div>
           <div>
             <label className="block text-xs text-zinc-500 mb-2 uppercase tracking-wider font-bold">
+              Shop Email
+            </label>
+            <input
+              type="email"
+              name="shop_email"
+              value={settings.shop_email || ""}
+              onChange={handleSettingsChange}
+              className="premium-input w-full rounded-xl px-4 py-3 outline-none transition-colors font-mono"
+              placeholder="shop@example.com"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-zinc-500 mb-2 uppercase tracking-wider font-bold">
               Shop GSTIN
             </label>
             <input
@@ -145,6 +162,21 @@ export default function AdminPanel() {
               value={settings.shop_state || ""}
               onChange={handleSettingsChange}
               className="premium-input w-full rounded-xl px-4 py-3 outline-none transition-colors"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-zinc-500 mb-2 uppercase tracking-wider font-bold">
+              Shop Pincode
+            </label>
+            <input
+              name="shop_pincode"
+              value={settings.shop_pincode || ""}
+              onChange={handleSettingsChange}
+              inputMode="numeric"
+              pattern="[0-9]{6}"
+              maxLength={6}
+              className="premium-input w-full rounded-xl px-4 py-3 outline-none transition-colors font-mono"
+              placeholder="673001"
             />
           </div>
         </div>

@@ -23,36 +23,45 @@ export const generateInvoice = (sale, settings) => {
   doc.text(`Invoice No: ${invoiceNo}`, 196, 20, { align: "right" });
   doc.text(`Date: ${date}`, 196, 26, { align: "right" });
 
-  // Shop Details (Seller)
+  // Shop Details (Seller) — address, state + pin, phone + gstin, email
   doc.setTextColor(80, 80, 80);
   doc.setFontSize(9);
   doc.text(settings.shop_address || "", 14, 45);
+
+  const stateLine = [
+    settings.shop_state,
+    settings.shop_pincode && `- ${settings.shop_pincode}`,
+  ]
+    .filter(Boolean)
+    .join(" ");
+  doc.text(stateLine || "", 14, 50);
+
   doc.text(
-    `Phone: ${settings.shop_phone || ""} | GSTIN: ${settings.shop_gstin || ""}`,
+    `Phone: ${settings.shop_phone || "N/A"} | GSTIN: ${settings.shop_gstin || "N/A"}`,
     14,
-    50,
+    55,
   );
-  doc.text(`State: ${settings.shop_state || ""}`, 14, 55);
+  doc.text(`Email: ${settings.shop_email || "N/A"}`, 14, 60);
 
   // Bill To (Buyer)
   doc.setDrawColor(230, 230, 230);
-  doc.line(14, 65, 196, 65);
+  doc.line(14, 70, 196, 70);
 
   doc.setFont("helvetica", "bold");
   doc.setTextColor(0, 0, 0);
-  doc.text("BILL TO", 14, 72);
+  doc.text("BILL TO", 14, 77);
 
   doc.setFont("helvetica", "normal");
   doc.setFontSize(10);
-  doc.text(sale.customer_name || "", 14, 79);
+  doc.text(sale.customer_name || "", 14, 84);
   doc.setFontSize(9);
   doc.setTextColor(80, 80, 80);
-  doc.text(sale.customer_address || "", 14, 85, { maxWidth: 110 });
-  doc.text(`Phone: ${sale.phone || ""}`, 14, 95);
+  doc.text(sale.customer_address || "", 14, 90, { maxWidth: 110 });
+  doc.text(`Phone: ${sale.phone || ""}`, 14, 100);
   doc.text(
     `GSTIN: ${sale.customer_gstin || "N/A"} | State: ${sale.customer_state || "N/A"}`,
     14,
-    100,
+    105,
   );
 
   // Calculations
@@ -67,7 +76,7 @@ export const generateInvoice = (sale, settings) => {
 
   // Items Table (Monospace for numbers)
   autoTable(doc, {
-    startY: 110,
+    startY: 115,
     head: [["#", "Description of Goods", "HSN", "Rate", "Qty", "Amount"]],
     body: [
       [
