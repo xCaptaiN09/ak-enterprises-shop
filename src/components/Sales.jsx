@@ -13,7 +13,6 @@ import {
   Battery,
   MapPin,
   Download,
-  Package,
 } from "lucide-react";
 import MapPicker from "./MapPicker";
 import { generateInvoice } from "../utils/generateInvoice";
@@ -36,8 +35,6 @@ export default function Sales({ isAdmin }) {
   const emptyForm = {
     customer_name: "",
     phone: "",
-    vehicle_number: "",
-    vehicle_type: "Car",
     discount: "",
     discount_type: "flat",
     sale_date: new Date().toISOString().split("T")[0],
@@ -57,8 +54,11 @@ export default function Sales({ isAdmin }) {
     hsn: "85071000",
     mrp: "",
     qty: 1,
+    vehicle_type: "Car",
+    vehicle_number: "",
+    warranty: "12",
   };
-  const [items, setItems] = useState([emptyItem]);
+  const [items, setItems] = useState([{ ...emptyItem }]);
 
   useEffect(() => {
     fetchSales();
@@ -108,7 +108,7 @@ export default function Sales({ isAdmin }) {
   const openNewForm = () => {
     setEditingItem(null);
     setForm(emptyForm);
-    setItems([emptyItem]);
+    setItems([{ ...emptyItem }]);
     setShowForm(true);
   };
 
@@ -123,6 +123,10 @@ export default function Sales({ isAdmin }) {
           hsn: i.hsn_code || "85071000",
           mrp: i.mrp || "",
           qty: i.quantity || 1,
+          vehicle_type: i.vehicle_type || "Car",
+          vehicle_number: i.vehicle_number || "",
+          warranty:
+            i.warranty_months != null ? String(i.warranty_months) : "12",
         })),
       );
     } else {
@@ -134,14 +138,16 @@ export default function Sales({ isAdmin }) {
           hsn: sale.hsn_code || "85071000",
           mrp: sale.mrp || "",
           qty: 1,
+          vehicle_type: sale.vehicle_type || "Car",
+          vehicle_number: sale.vehicle_number || "",
+          warranty:
+            sale.warranty_months != null ? String(sale.warranty_months) : "12",
         },
       ]);
     }
     setForm({
       customer_name: sale.customer_name || "",
       phone: sale.phone || "",
-      vehicle_number: sale.vehicle_number || "",
-      vehicle_type: sale.vehicle_type || "Car",
       discount: sale.discount || "",
       discount_type: sale.discount_type || "flat",
       sale_date: sale.sale_date || "",
@@ -174,12 +180,11 @@ export default function Sales({ isAdmin }) {
     const inv = inventory.find((i) => i.id === id);
     if (!inv) return;
     const newItem = {
+      ...emptyItem,
       brand: inv.brand,
       model: inv.model,
-      serial: "",
-      hsn: inv.hsn_code || "85071000",
       mrp: inv.price || "",
-      qty: 1,
+      hsn: inv.hsn_code || "85071000",
     };
     const emptyIdx = items.findIndex((i) => !i.brand);
     if (emptyIdx >= 0) {
@@ -240,7 +245,6 @@ export default function Sales({ isAdmin }) {
       return;
     }
 
-    // Check serial number uniqueness (sales + sale_items, exclude current sale if editing)
     for (const item of validItems) {
       if (item.serial && item.serial.trim()) {
         const serial = item.serial.trim();
@@ -270,7 +274,6 @@ export default function Sales({ isAdmin }) {
       }
     }
 
-    // Calculate totals
     const subtotal = validItems.reduce(
       (sum, i) => sum + (parseFloat(i.mrp) || 0) * (parseInt(i.qty) || 1),
       0,
@@ -291,6 +294,11 @@ export default function Sales({ isAdmin }) {
       battery_model: validItems[0].model,
       serial_number: validItems[0].serial || null,
       hsn_code: validItems[0].hsn || "85071000",
+      vehicle_type: validItems[0].vehicle_type || "Car",
+      vehicle_number: validItems[0].vehicle_number || null,
+      warranty_months: validItems[0].warranty
+        ? parseInt(validItems[0].warranty)
+        : null,
     };
 
     let saleId;
@@ -320,6 +328,9 @@ export default function Sales({ isAdmin }) {
       hsn_code: i.hsn || "85071000",
       mrp: parseFloat(i.mrp) || 0,
       quantity: parseInt(i.qty) || 1,
+      vehicle_type: i.vehicle_type || "Car",
+      vehicle_number: i.vehicle_number || null,
+      warranty_months: i.warranty ? parseInt(i.warranty) : null,
     }));
     const { error: itemError } = await supabase
       .from("sale_items")
@@ -380,7 +391,6 @@ export default function Sales({ isAdmin }) {
       const textMatch =
         sale.customer_name?.toLowerCase().includes(search.toLowerCase()) ||
         sale.phone?.toLowerCase().includes(search.toLowerCase()) ||
-        sale.vehicle_number?.toLowerCase().includes(search.toLowerCase()) ||
         `INV-${sale.id?.substring(0, 8).toUpperCase()}`
           .toLowerCase()
           .includes(search.toLowerCase()) ||
@@ -389,11 +399,13 @@ export default function Sales({ isAdmin }) {
               (i) =>
                 i.battery_brand?.toLowerCase().includes(search.toLowerCase()) ||
                 i.battery_model?.toLowerCase().includes(search.toLowerCase()) ||
-                i.serial_number?.toLowerCase().includes(search.toLowerCase()),
+                i.serial_number?.toLowerCase().includes(search.toLowerCase()) ||
+                i.vehicle_number?.toLowerCase().includes(search.toLowerCase()),
             )
           : sale.battery_brand?.toLowerCase().includes(search.toLowerCase()) ||
             sale.battery_model?.toLowerCase().includes(search.toLowerCase()) ||
-            sale.serial_number?.toLowerCase().includes(search.toLowerCase()));
+            sale.serial_number?.toLowerCase().includes(search.toLowerCase()) ||
+            sale.vehicle_number?.toLowerCase().includes(search.toLowerCase()));
       return brandMatch && textMatch;
     });
 
@@ -541,45 +553,42 @@ export default function Sales({ isAdmin }) {
                     className="overflow-hidden"
                   >
                     <div className="p-4 border-t border-zinc-200 dark:border-zinc-800">
-                      {/* Items list */}
                       {sale.items && sale.items.length > 0 ? (
                         <div className="mb-4 space-y-2">
                           {sale.items.map((item, idx) => (
                             <div
                               key={idx}
-                              className="bg-zinc-100 dark:bg-zinc-800 p-3 rounded-lg flex items-center justify-between text-sm"
+                              className="bg-zinc-100 dark:bg-zinc-800 p-3 rounded-lg text-sm"
                             >
-                              <div>
+                              <div className="flex items-center justify-between">
                                 <div className="font-semibold text-zinc-900 dark:text-white">
                                   {item.battery_brand} {item.battery_model}
                                 </div>
-                                <div className="text-zinc-500 dark:text-zinc-400 text-xs font-mono">
-                                  S/N: {item.serial_number || "N/A"} • HSN:{" "}
-                                  {item.hsn_code || "-"}
+                                <div className="text-right">
+                                  <div className="font-bold text-zinc-900 dark:text-white font-mono">
+                                    ₹{item.mrp || "-"}
+                                  </div>
+                                  <div className="text-zinc-500 dark:text-zinc-400 text-xs">
+                                    Qty: {item.quantity || 1}
+                                  </div>
                                 </div>
                               </div>
-                              <div className="text-right">
-                                <div className="font-bold text-zinc-900 dark:text-white font-mono">
-                                  ₹{item.mrp || "-"}
-                                </div>
-                                <div className="text-zinc-500 dark:text-zinc-400 text-xs">
-                                  Qty: {item.quantity || 1}
-                                </div>
+                              <div className="text-zinc-500 dark:text-zinc-400 text-xs font-mono mt-1">
+                                S/N: {item.serial_number || "N/A"} • HSN:{" "}
+                                {item.hsn_code || "-"}
+                              </div>
+                              <div className="text-zinc-500 dark:text-zinc-400 text-xs mt-1">
+                                Vehicle: {item.vehicle_type || "-"} (
+                                {item.vehicle_number || "-"}) • Warranty:{" "}
+                                {item.warranty_months != null
+                                  ? `${item.warranty_months} mo`
+                                  : "-"}
                               </div>
                             </div>
                           ))}
                         </div>
                       ) : (
                         <div className="grid grid-cols-2 gap-4 text-sm mb-4">
-                          <div>
-                            <span className="text-zinc-400 dark:text-zinc-500 uppercase text-xs block mb-1">
-                              Vehicle
-                            </span>
-                            <span className="text-zinc-900 dark:text-white">
-                              {sale.vehicle_type || "-"} (
-                              {sale.vehicle_number || "-"})
-                            </span>
-                          </div>
                           <div>
                             <span className="text-zinc-400 dark:text-zinc-500 uppercase text-xs block mb-1">
                               Battery
@@ -598,17 +607,29 @@ export default function Sales({ isAdmin }) {
                           </div>
                           <div>
                             <span className="text-zinc-400 dark:text-zinc-500 uppercase text-xs block mb-1">
-                              HSN Code
+                              Vehicle
                             </span>
-                            <span className="text-zinc-900 dark:text-white font-mono">
-                              {sale.hsn_code || "-"}
+                            <span className="text-zinc-900 dark:text-white">
+                              {sale.vehicle_type || "-"} (
+                              {sale.vehicle_number || "-"})
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-zinc-400 dark:text-zinc-500 uppercase text-xs block mb-1">
+                              Warranty Until
+                            </span>
+                            <span className="text-zinc-900 dark:text-white">
+                              {calculateExpiry(
+                                sale.sale_date,
+                                sale.warranty_months,
+                              )}
                             </span>
                           </div>
                         </div>
                       )}
 
                       <div className="grid grid-cols-2 gap-4 text-sm mb-4">
-                        <div>
+                        <div className="col-span-2">
                           <span className="text-zinc-400 dark:text-zinc-500 uppercase text-xs block mb-1">
                             Date & Time
                           </span>
@@ -617,15 +638,6 @@ export default function Sales({ isAdmin }) {
                               ? new Date(sale.sale_date).toLocaleDateString()
                               : "-"}{" "}
                             {sale.sale_time || ""}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-zinc-400 dark:text-zinc-500 uppercase text-xs block mb-1">
-                            Vehicle
-                          </span>
-                          <span className="text-zinc-900 dark:text-white">
-                            {sale.vehicle_type || "-"} (
-                            {sale.vehicle_number || "-"})
                           </span>
                         </div>
                         <div className="col-span-2 grid grid-cols-3 gap-2 mt-2 bg-zinc-100 dark:bg-zinc-800 p-3 rounded-lg border border-zinc-200 dark:border-zinc-700">
@@ -886,43 +898,7 @@ export default function Sales({ isAdmin }) {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs text-zinc-500 mb-2 uppercase tracking-wider font-bold">
-                      Vehicle Number
-                    </label>
-                    <input
-                      name="vehicle_number"
-                      value={form.vehicle_number || ""}
-                      onChange={handleChange}
-                      className="premium-input w-full rounded-xl px-4 py-3 outline-none transition-colors"
-                      placeholder="KA01AB1234"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs text-zinc-500 mb-2 uppercase tracking-wider font-bold">
-                      Vehicle Type
-                    </label>
-                    <input
-                      list="vehicle-types"
-                      name="vehicle_type"
-                      value={form.vehicle_type || ""}
-                      onChange={handleChange}
-                      className="premium-input w-full rounded-xl px-4 py-3 outline-none transition-colors"
-                      placeholder="Select or type"
-                    />
-                    <datalist id="vehicle-types">
-                      <option value="Car" />
-                      <option value="Bike" />
-                      <option value="Truck" />
-                      <option value="Auto-rickshaw" />
-                      <option value="Bus" />
-                      <option value="Inverter" />
-                    </datalist>
-                  </div>
-                </div>
-
-                {/* Items Section */}
+                {/* Items */}
                 <div className="border-t border-zinc-200 dark:border-zinc-800 pt-4 mt-4">
                   <div className="flex justify-between items-center mb-3">
                     <label className="block text-xs text-zinc-500 uppercase tracking-wider font-bold">
@@ -1055,23 +1031,77 @@ export default function Sales({ isAdmin }) {
                             </label>
                             <input
                               type="number"
+                              min="1"
                               value={item.qty}
                               onChange={(e) =>
                                 updateItem(idx, "qty", e.target.value)
                               }
                               readOnly={!isAdmin}
-                              min="1"
                               className={`premium-input w-full rounded-lg px-3 py-2 outline-none transition-colors text-sm font-mono ${!isAdmin ? "cursor-not-allowed opacity-50" : ""}`}
                               placeholder="1"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-zinc-500 mb-1 uppercase tracking-wider font-bold">
+                              Vehicle Type
+                            </label>
+                            <input
+                              list="vehicle-types"
+                              value={item.vehicle_type}
+                              onChange={(e) =>
+                                updateItem(idx, "vehicle_type", e.target.value)
+                              }
+                              className="premium-input w-full rounded-lg px-3 py-2 outline-none transition-colors text-sm"
+                              placeholder="Car"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-zinc-500 mb-1 uppercase tracking-wider font-bold">
+                              Vehicle No.
+                            </label>
+                            <input
+                              value={item.vehicle_number}
+                              onChange={(e) =>
+                                updateItem(
+                                  idx,
+                                  "vehicle_number",
+                                  e.target.value,
+                                )
+                              }
+                              className="premium-input w-full rounded-lg px-3 py-2 outline-none transition-colors text-sm"
+                              placeholder="KL01AB1234"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-zinc-500 mb-1 uppercase tracking-wider font-bold">
+                              Warranty (Months)
+                            </label>
+                            <input
+                              type="number"
+                              value={item.warranty}
+                              onChange={(e) =>
+                                updateItem(idx, "warranty", e.target.value)
+                              }
+                              readOnly={!isAdmin}
+                              className={`premium-input w-full rounded-lg px-3 py-2 outline-none transition-colors text-sm font-mono ${!isAdmin ? "cursor-not-allowed opacity-50" : ""}`}
+                              placeholder="12"
                             />
                           </div>
                         </div>
                       </div>
                     ))}
                   </div>
+                  <datalist id="vehicle-types">
+                    <option value="Car" />
+                    <option value="Bike" />
+                    <option value="Truck" />
+                    <option value="Auto-rickshaw" />
+                    <option value="Bus" />
+                    <option value="Inverter" />
+                  </datalist>
                 </div>
 
-                {/* Discount */}
+                {/* Overall discount */}
                 <div className="border-t border-zinc-200 dark:border-zinc-800 pt-4 mt-4">
                   <label className="block text-xs text-zinc-500 mb-2 uppercase tracking-wider font-bold">
                     Overall Discount
@@ -1109,7 +1139,6 @@ export default function Sales({ isAdmin }) {
                   </div>
                 </div>
 
-                {/* Totals */}
                 <div className="bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl p-4 space-y-2">
                   <div className="flex justify-between text-sm">
                     <span className="text-zinc-500 uppercase tracking-wider font-bold text-xs">

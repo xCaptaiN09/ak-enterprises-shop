@@ -74,28 +74,38 @@ export const generateInvoice = (sale, settings) => {
   const cgst = taxableValue * 0.09;
   const sgst = taxableValue * 0.09;
 
-  // Build items array (support both new multi-item and legacy single-item)
-  let items = [];
+  // Build items rows (multi-item with prorated discount, or legacy single-item)
+  let rows = [];
   if (sale.items && sale.items.length > 0) {
-    items = sale.items.map((i, idx) => ({
-      idx: idx + 1,
-      desc: `${i.battery_brand} ${i.battery_model}\nS/N: ${i.serial_number || "N/A"}`,
-      hsn: i.hsn_code || "85071000",
-      rate: ((i.mrp || 0) * (i.quantity || 1)) / 1.18,
-      qty: i.quantity || 1,
-      amount: ((i.mrp || 0) * (i.quantity || 1)) / 1.18,
-    }));
+    const subtotalGross = sale.items.reduce(
+      (s, i) => s + (i.mrp || 0) * (i.quantity || 1),
+      0,
+    );
+    rows = sale.items.map((i, idx) => {
+      const gross = (i.mrp || 0) * (i.quantity || 1);
+      const share = subtotalGross > 0 ? gross / subtotalGross : 0;
+      const net = gross - discountAmount * share;
+      const taxable = net / 1.18;
+      const qty = i.quantity || 1;
+      return [
+        String(idx + 1),
+        `${i.battery_brand} ${i.battery_model}\nS/N: ${i.serial_number || "N/A"}\nVehicle: ${i.vehicle_type || "-"} (${i.vehicle_number || "-"})`,
+        i.hsn_code || "85071000",
+        (taxable / qty).toFixed(2),
+        String(qty),
+        taxable.toFixed(2),
+      ];
+    });
   } else {
-    // Legacy single-item sale
-    items = [
-      {
-        idx: 1,
-        desc: `${sale.battery_brand} ${sale.battery_model}\nS/N: ${sale.serial_number || "N/A"}`,
-        hsn: sale.hsn_code || "85071000",
-        rate: taxableValue,
-        qty: 1,
-        amount: taxableValue,
-      },
+    rows = [
+      [
+        "1",
+        `${sale.battery_brand} ${sale.battery_model}\nS/N: ${sale.serial_number || "N/A"}\nVehicle: ${sale.vehicle_type || "-"} (${sale.vehicle_number || "-"})`,
+        sale.hsn_code || "85071000",
+        taxableValue.toFixed(2),
+        "1",
+        taxableValue.toFixed(2),
+      ],
     ];
   }
 
@@ -103,14 +113,7 @@ export const generateInvoice = (sale, settings) => {
   autoTable(doc, {
     startY: 115,
     head: [["#", "Description of Goods", "HSN", "Rate", "Qty", "Amount"]],
-    body: items.map((i) => [
-      i.idx.toString(),
-      i.desc,
-      i.hsn,
-      i.rate.toFixed(2),
-      i.qty.toString(),
-      i.amount.toFixed(2),
-    ]),
+    body: rows,
     theme: "grid",
     headStyles: {
       fillColor: [245, 245, 245],
@@ -180,8 +183,9 @@ export const generateInvoice = (sale, settings) => {
   doc.setFont("courier", "bold");
   doc.setFontSize(12);
   doc.setTextColor(0, 0, 0);
-  doc.text("GRAND TOTAL:", summaryX, summaryY);
-  doc.text(`Rs. ${finalPrice.toFixed(2)}`, 196, summaryY, { align: "right" });
+  doc.text(`GRAND TOTAL: Rs. ${finalPrice.toFixed(2)}`, 196, summaryY, {
+    align: "right",
+  });
 
   // Amount in words (Left aligned, Helvetica)
   doc.setFont("helvetica", "italic");
