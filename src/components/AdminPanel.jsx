@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../supabaseClient";
 import { Save, Mail, Check, X } from "lucide-react";
+import { toast } from "../utils/toast";
 
 export default function AdminPanel() {
   const [users, setUsers] = useState([]);
@@ -66,8 +67,8 @@ export default function AdminPanel() {
       })
       .eq("id", 1);
 
-    if (error) alert("Error saving settings: " + error.message);
-    else alert("Shop settings saved successfully!");
+    if (error) toast("Error saving settings: " + error.message);
+    else toast("Shop settings saved successfully!", "success");
     setSavingSettings(false);
   };
 

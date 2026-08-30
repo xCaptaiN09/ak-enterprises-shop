@@ -4,6 +4,7 @@ import { ThemeProvider } from "./context/ThemeContext";
 import Login from "./components/Login";
 import Dashboard from "./components/Dashboard";
 import { Loader2 } from "lucide-react";
+import { Toaster } from "./utils/toast";
 
 function App() {
   const [session, setSession] = useState(null);
@@ -28,7 +29,12 @@ function App() {
     );
   }
 
-  return <ThemeProvider>{session ? <Dashboard /> : <Login />}</ThemeProvider>;
+  return (
+    <ThemeProvider>
+      <Toaster />
+      {session ? <Dashboard /> : <Login />}
+    </ThemeProvider>
+  );
 }
 
 export default App;

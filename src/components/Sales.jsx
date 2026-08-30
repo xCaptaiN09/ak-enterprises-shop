@@ -14,6 +14,7 @@ import {
   MapPin,
   Download,
 } from "lucide-react";
+import { toast } from "../utils/toast";
 import MapPicker from "./MapPicker";
 import { generateInvoice } from "../utils/generateInvoice";
 
@@ -202,7 +203,7 @@ export default function Sales({ isAdmin }) {
     const uploadedUrls = [...(form.image_urls || [])];
     for (const file of files) {
       if (uploadedUrls.length >= 4) {
-        alert("Maximum 4 photos allowed.");
+        toast("Maximum 4 photos allowed.");
         break;
       }
       const fileName = `sale_${Date.now()}_${file.name}`;
@@ -210,7 +211,7 @@ export default function Sales({ isAdmin }) {
         .from("battery-images")
         .upload(fileName, file);
       if (error) {
-        alert("Error uploading image: " + error.message);
+        toast("Error uploading image: " + error.message);
       } else {
         const { data } = supabase.storage
           .from("battery-images")
@@ -241,7 +242,7 @@ export default function Sales({ isAdmin }) {
 
     const validItems = items.filter((i) => i.brand && i.model);
     if (validItems.length === 0) {
-      alert("Add at least one battery (brand and model required).");
+      toast("Add at least one battery (brand and model required).");
       return;
     }
 
@@ -255,7 +256,7 @@ export default function Sales({ isAdmin }) {
           .neq("id", editingItem?.id || "00000000-0000-0000-0000-000000000000")
           .limit(1);
         if (inSales && inSales.length > 0) {
-          alert(`Serial ${serial} already used in another sale.`);
+          toast(`Serial ${serial} already used in another sale.`);
           return;
         }
         const { data: inItems } = await supabase
@@ -268,7 +269,7 @@ export default function Sales({ isAdmin }) {
           )
           .limit(1);
         if (inItems && inItems.length > 0) {
-          alert(`Serial ${serial} already used in another sale.`);
+          toast(`Serial ${serial} already used in another sale.`);
           return;
         }
       }
@@ -307,7 +308,7 @@ export default function Sales({ isAdmin }) {
         .from("sales")
         .update(payload)
         .eq("id", editingItem.id);
-      if (error) return alert("Error updating: " + error.message);
+      if (error) return toast("Error updating: " + error.message);
       saleId = editingItem.id;
       await supabase.from("sale_items").delete().eq("sale_id", saleId);
     } else {
@@ -316,7 +317,7 @@ export default function Sales({ isAdmin }) {
         .insert([payload])
         .select()
         .single();
-      if (error) return alert("Error saving: " + error.message);
+      if (error) return toast("Error saving: " + error.message);
       saleId = data.id;
     }
 
@@ -335,7 +336,7 @@ export default function Sales({ isAdmin }) {
     const { error: itemError } = await supabase
       .from("sale_items")
       .insert(itemsPayload);
-    if (itemError) return alert("Error saving items: " + itemError.message);
+    if (itemError) return toast("Error saving items: " + itemError.message);
 
     setShowForm(false);
     fetchSales();
@@ -742,7 +743,7 @@ export default function Sales({ isAdmin }) {
                               onClick={() =>
                                 deleteText === "DELETE"
                                   ? handleDelete(sale.id)
-                                  : alert("Text doesn't match")
+                                  : toast("Text doesn't match")
                               }
                               className="flex-1 bg-red-500 text-white py-2 rounded-lg text-sm font-medium hover:bg-red-600"
                             >

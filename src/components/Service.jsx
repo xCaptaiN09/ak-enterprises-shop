@@ -14,6 +14,7 @@ import {
   MapPin,
 } from "lucide-react";
 import MapPicker from "./MapPicker";
+import { toast } from "../utils/toast";
 
 export default function Service({ isAdmin }) {
   const [records, setRecords] = useState([]);
@@ -31,10 +32,6 @@ export default function Service({ isAdmin }) {
   const emptyForm = {
     customer_name: "",
     phone: "",
-    battery_brand: "",
-    battery_model: "",
-    serial_number: "",
-    issue: "",
     status: "Received",
     date_received: new Date().toISOString().split("T")[0],
     received_time: new Date().toTimeString().split(" ")[0],
@@ -44,33 +41,95 @@ export default function Service({ isAdmin }) {
   };
   const [form, setForm] = useState(emptyForm);
 
+  const emptyItem = { brand: "", model: "", serial: "", issue: "" };
+  const [items, setItems] = useState([{ ...emptyItem }]);
+
   useEffect(() => {
     fetchService();
   }, []);
 
   const fetchService = async () => {
     setLoading(true);
-    const { data } = await supabase
+    const { data: serviceData } = await supabase
       .from("service")
       .select("*")
       .order("created_at", { ascending: false });
-    if (data) setRecords(data);
+    const { data: itemsData } = await supabase
+      .from("service_items")
+      .select("*");
+
+    const itemsMap = {};
+    if (itemsData) {
+      itemsData.forEach((it) => {
+        if (!itemsMap[it.service_id]) itemsMap[it.service_id] = [];
+        itemsMap[it.service_id].push(it);
+      });
+    }
+
+    const enriched = (serviceData || []).map((svc) => ({
+      ...svc,
+      items: itemsMap[svc.id] || [],
+    }));
+
+    setRecords(enriched);
     setLoading(false);
   };
 
   const openNewForm = () => {
     setEditingItem(null);
     setForm(emptyForm);
+    setItems([{ ...emptyItem }]);
     setShowForm(true);
   };
-  const openEditForm = (item) => {
-    setEditingItem(item);
-    setForm(item);
+
+  const openEditForm = (svc) => {
+    setEditingItem(svc);
+    if (svc.items && svc.items.length > 0) {
+      setItems(
+        svc.items.map((i) => ({
+          brand: i.battery_brand || "",
+          model: i.battery_model || "",
+          serial: i.serial_number || "",
+          issue: i.issue || "",
+        })),
+      );
+    } else {
+      setItems([
+        {
+          brand: svc.battery_brand || "",
+          model: svc.battery_model || "",
+          serial: svc.serial_number || "",
+          issue: svc.issue || "",
+        },
+      ]);
+    }
+    setForm({
+      customer_name: svc.customer_name || "",
+      phone: svc.phone || "",
+      status: svc.status || "Received",
+      date_received: svc.date_received || "",
+      received_time: svc.received_time || "",
+      customer_address: svc.customer_address || "",
+      map_coordinates: svc.map_coordinates || "",
+      image_urls: svc.image_urls || [],
+    });
     setShowForm(true);
     setExpandedId(null);
   };
+
   const handleChange = (e) =>
     setForm({ ...form, [e.target.name]: e.target.value });
+
+  const addItem = () => setItems([...items, { ...emptyItem }]);
+  const removeItem = (idx) => {
+    if (items.length === 1) return;
+    setItems(items.filter((_, i) => i !== idx));
+  };
+  const updateItem = (idx, field, value) => {
+    const updated = [...items];
+    updated[idx][field] = value;
+    setItems(updated);
+  };
 
   const handleImageUpload = async (e) => {
     const files = Array.from(e.target.files);
@@ -78,7 +137,7 @@ export default function Service({ isAdmin }) {
     const uploadedUrls = [...(form.image_urls || [])];
     for (const file of files) {
       if (uploadedUrls.length >= 4) {
-        alert("Maximum 4 photos allowed.");
+        toast("Maximum 4 photos allowed.", "info");
         break;
       }
       const fileName = `service_${Date.now()}_${file.name}`;
@@ -86,7 +145,7 @@ export default function Service({ isAdmin }) {
         .from("battery-images")
         .upload(fileName, file);
       if (error) {
-        alert("Error uploading image: " + error.message);
+        toast("Error uploading image: " + error.message);
       } else {
         const { data } = supabase.storage
           .from("battery-images")
@@ -114,16 +173,51 @@ export default function Service({ isAdmin }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    const validItems = items.filter((i) => i.brand || i.model || i.serial);
+    if (validItems.length === 0) {
+      toast("Add at least one battery (brand, model or serial).");
+      return;
+    }
+
+    const payload = {
+      ...form,
+      battery_brand: validItems[0].brand,
+      battery_model: validItems[0].model,
+      serial_number: validItems[0].serial || null,
+      issue: validItems[0].issue,
+    };
+
+    let serviceId;
     if (editingItem) {
       const { error } = await supabase
         .from("service")
-        .update(form)
+        .update(payload)
         .eq("id", editingItem.id);
-      if (error) return alert("Error updating: " + error.message);
+      if (error) return toast("Error updating: " + error.message);
+      serviceId = editingItem.id;
+      await supabase.from("service_items").delete().eq("service_id", serviceId);
     } else {
-      const { error } = await supabase.from("service").insert([form]);
-      if (error) return alert("Error saving: " + error.message);
+      const { data, error } = await supabase
+        .from("service")
+        .insert([payload])
+        .select()
+        .single();
+      if (error) return toast("Error saving: " + error.message);
+      serviceId = data.id;
     }
+
+    const itemsPayload = validItems.map((i) => ({
+      service_id: serviceId,
+      battery_brand: i.brand,
+      battery_model: i.model,
+      serial_number: i.serial || null,
+      issue: i.issue,
+    }));
+    const { error: itemError } = await supabase
+      .from("service_items")
+      .insert(itemsPayload);
+    if (itemError) return toast("Error saving items: " + itemError.message);
+
     setShowForm(false);
     fetchService();
   };
@@ -157,14 +251,23 @@ export default function Service({ isAdmin }) {
   };
 
   const displayedRecords = useMemo(() => {
-    let filtered = records.filter(
-      (item) =>
-        (filterStatus === "all" || item.status === filterStatus) &&
-        (item.customer_name?.toLowerCase().includes(search.toLowerCase()) ||
-          item.phone?.toLowerCase().includes(search.toLowerCase()) ||
-          item.battery_brand?.toLowerCase().includes(search.toLowerCase()) ||
-          item.serial_number?.toLowerCase().includes(search.toLowerCase())),
-    );
+    let filtered = records.filter((svc) => {
+      const statusMatch = filterStatus === "all" || svc.status === filterStatus;
+      const q = search.toLowerCase();
+      const textMatch =
+        svc.customer_name?.toLowerCase().includes(q) ||
+        svc.phone?.toLowerCase().includes(q) ||
+        (svc.items && svc.items.length > 0
+          ? svc.items.some(
+              (i) =>
+                i.battery_brand?.toLowerCase().includes(q) ||
+                i.battery_model?.toLowerCase().includes(q) ||
+                i.serial_number?.toLowerCase().includes(q),
+            )
+          : svc.battery_brand?.toLowerCase().includes(q) ||
+            svc.serial_number?.toLowerCase().includes(q));
+      return statusMatch && textMatch;
+    });
     if (sort === "newest")
       filtered.sort(
         (a, b) => new Date(b.date_received) - new Date(a.date_received),
@@ -285,8 +388,9 @@ export default function Service({ isAdmin }) {
                       </span>
                     </div>
                     <div className="text-zinc-500 dark:text-zinc-500 text-xs font-mono truncate">
-                      {svc.battery_brand}{" "}
-                      {svc.serial_number || svc.battery_model}
+                      {svc.items && svc.items.length > 0
+                        ? `${svc.items.length} batter${svc.items.length > 1 ? "ies" : "y"}`
+                        : `${svc.battery_brand || ""} ${svc.serial_number || svc.battery_model || ""}`}
                     </div>
                   </div>
                   <select
@@ -320,6 +424,56 @@ export default function Service({ isAdmin }) {
                     className="overflow-hidden"
                   >
                     <div className="p-4 border-t border-zinc-200 dark:border-zinc-800">
+                      {svc.items && svc.items.length > 0 ? (
+                        <div className="mb-4 space-y-2">
+                          {svc.items.map((item, idx) => (
+                            <div
+                              key={idx}
+                              className="bg-zinc-100 dark:bg-zinc-800 p-3 rounded-lg text-sm"
+                            >
+                              <div className="font-semibold text-zinc-900 dark:text-white">
+                                {item.battery_brand} {item.battery_model}
+                              </div>
+                              <div className="text-zinc-500 dark:text-zinc-400 text-xs font-mono mt-1">
+                                S/N: {item.serial_number || "N/A"}
+                              </div>
+                              {item.issue && (
+                                <div className="text-zinc-500 dark:text-zinc-400 text-xs mt-1">
+                                  Issue: {item.issue}
+                                </div>
+                              )}
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="grid grid-cols-2 gap-4 text-sm mb-4">
+                          <div>
+                            <span className="text-zinc-400 dark:text-zinc-500 uppercase text-xs block mb-1">
+                              Battery
+                            </span>
+                            <span className="text-zinc-900 dark:text-white">
+                              {svc.battery_brand} {svc.battery_model}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="text-zinc-400 dark:text-zinc-500 uppercase text-xs block mb-1">
+                              Serial
+                            </span>
+                            <span className="text-zinc-900 dark:text-white font-mono">
+                              {svc.serial_number || "-"}
+                            </span>
+                          </div>
+                          <div className="col-span-2">
+                            <span className="text-zinc-400 dark:text-zinc-500 uppercase text-xs block mb-1">
+                              Issue
+                            </span>
+                            <span className="text-zinc-900 dark:text-white">
+                              {svc.issue || "-"}
+                            </span>
+                          </div>
+                        </div>
+                      )}
+
                       <div className="grid grid-cols-2 gap-4 text-sm mb-4">
                         <div>
                           <span className="text-zinc-400 dark:text-zinc-500 uppercase text-xs block mb-1">
@@ -330,22 +484,6 @@ export default function Service({ isAdmin }) {
                               ? new Date(svc.date_received).toLocaleDateString()
                               : "-"}{" "}
                             {svc.received_time || ""}
-                          </span>
-                        </div>
-                        <div>
-                          <span className="text-zinc-400 dark:text-zinc-500 uppercase text-xs block mb-1">
-                            Serial Number
-                          </span>
-                          <span className="text-zinc-900 dark:text-white font-mono">
-                            {svc.serial_number || "-"}
-                          </span>
-                        </div>
-                        <div className="col-span-2">
-                          <span className="text-zinc-400 dark:text-zinc-500 uppercase text-xs block mb-1">
-                            Issue
-                          </span>
-                          <span className="text-zinc-900 dark:text-white">
-                            {svc.issue || "-"}
                           </span>
                         </div>
                         <div className="col-span-2">
@@ -413,7 +551,7 @@ export default function Service({ isAdmin }) {
                               onClick={() =>
                                 deleteText === "DELETE"
                                   ? handleDelete(svc.id)
-                                  : alert("Text doesn't match")
+                                  : toast("Text doesn't match")
                               }
                               className="flex-1 bg-red-500 text-white py-2 rounded-lg text-sm font-medium hover:bg-red-600"
                             >
@@ -536,45 +674,98 @@ export default function Service({ isAdmin }) {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-xs text-zinc-500 mb-2 uppercase tracking-wider font-bold">
-                      Battery Brand
+                {/* Items */}
+                <div className="border-t border-zinc-200 dark:border-zinc-800 pt-4 mt-4">
+                  <div className="flex justify-between items-center mb-3">
+                    <label className="block text-xs text-zinc-500 uppercase tracking-wider font-bold">
+                      Batteries Received
                     </label>
-                    <input
-                      name="battery_brand"
-                      value={form.battery_brand || ""}
-                      onChange={handleChange}
-                      className="premium-input w-full rounded-xl px-4 py-3 outline-none transition-colors"
-                      placeholder="Amaron"
-                    />
+                    <button
+                      type="button"
+                      onClick={addItem}
+                      className="flex items-center gap-1 text-xs font-bold text-indigo-500 dark:text-indigo-400 hover:text-indigo-600"
+                    >
+                      <Plus className="w-3 h-3" /> Add Battery
+                    </button>
                   </div>
-                  <div>
-                    <label className="block text-xs text-zinc-500 mb-2 uppercase tracking-wider font-bold">
-                      Model / Serial No.
-                    </label>
-                    <input
-                      name="serial_number"
-                      value={form.serial_number || ""}
-                      onChange={handleChange}
-                      className="premium-input w-full rounded-xl px-4 py-3 outline-none transition-colors font-mono"
-                      placeholder="SN98765"
-                    />
+                  <div className="space-y-3">
+                    {items.map((item, idx) => (
+                      <div
+                        key={idx}
+                        className="border border-zinc-200 dark:border-zinc-700 rounded-xl p-3 space-y-3"
+                      >
+                        <div className="flex justify-between items-center">
+                          <span className="text-xs font-bold text-zinc-500 uppercase">
+                            Battery {idx + 1}
+                          </span>
+                          {items.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => removeItem(idx)}
+                              className="text-red-500 hover:text-red-600"
+                            >
+                              <X className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-2 gap-3">
+                          <div>
+                            <label className="block text-xs text-zinc-500 mb-1 uppercase tracking-wider font-bold">
+                              Brand
+                            </label>
+                            <input
+                              value={item.brand}
+                              onChange={(e) =>
+                                updateItem(idx, "brand", e.target.value)
+                              }
+                              className="premium-input w-full rounded-lg px-3 py-2 outline-none transition-colors text-sm"
+                              placeholder="Amaron"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs text-zinc-500 mb-1 uppercase tracking-wider font-bold">
+                              Model
+                            </label>
+                            <input
+                              value={item.model}
+                              onChange={(e) =>
+                                updateItem(idx, "model", e.target.value)
+                              }
+                              className="premium-input w-full rounded-lg px-3 py-2 outline-none transition-colors text-sm"
+                              placeholder="DIN55"
+                            />
+                          </div>
+                          <div className="col-span-2">
+                            <label className="block text-xs text-zinc-500 mb-1 uppercase tracking-wider font-bold">
+                              Serial No.
+                            </label>
+                            <input
+                              value={item.serial}
+                              onChange={(e) =>
+                                updateItem(idx, "serial", e.target.value)
+                              }
+                              className="premium-input w-full rounded-lg px-3 py-2 outline-none transition-colors text-sm font-mono"
+                              placeholder="SN98765"
+                            />
+                          </div>
+                          <div className="col-span-2">
+                            <label className="block text-xs text-zinc-500 mb-1 uppercase tracking-wider font-bold">
+                              Issue / Service Needed
+                            </label>
+                            <textarea
+                              value={item.issue}
+                              onChange={(e) =>
+                                updateItem(idx, "issue", e.target.value)
+                              }
+                              rows="2"
+                              className="premium-input w-full rounded-lg px-3 py-2 outline-none transition-colors text-sm"
+                              placeholder="Not charging, low backup..."
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs text-zinc-500 mb-2 uppercase tracking-wider font-bold">
-                    Issue / Service Needed
-                  </label>
-                  <textarea
-                    name="issue"
-                    value={form.issue || ""}
-                    onChange={handleChange}
-                    rows="3"
-                    className="premium-input w-full rounded-xl px-4 py-3 outline-none transition-colors"
-                    placeholder="Not charging, low backup, etc."
-                  ></textarea>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

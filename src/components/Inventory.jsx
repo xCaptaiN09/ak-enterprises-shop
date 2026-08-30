@@ -11,6 +11,7 @@ import {
   ArrowUpDown,
   ChevronDown,
 } from "lucide-react";
+import { toast } from "../utils/toast";
 
 export default function Inventory({ isAdmin }) {
   const [items, setItems] = useState([]);
@@ -82,10 +83,10 @@ export default function Inventory({ isAdmin }) {
         .from("inventory")
         .update(payload)
         .eq("id", editingItem.id);
-      if (error) return alert("Error updating: " + error.message);
+      if (error) return toast("Error updating: " + error.message);
     } else {
       const { error } = await supabase.from("inventory").insert([payload]);
-      if (error) return alert("Error saving: " + error.message);
+      if (error) return toast("Error saving: " + error.message);
     }
     setShowForm(false);
     fetchInventory();
@@ -291,7 +292,7 @@ export default function Inventory({ isAdmin }) {
                               onClick={() =>
                                 deleteText === "DELETE"
                                   ? handleDelete(item.id)
-                                  : alert("Text doesn't match")
+                                  : toast("Text doesn't match")
                               }
                               className="flex-1 bg-red-500 text-white py-2 rounded-lg text-sm font-medium hover:bg-red-600"
                             >
