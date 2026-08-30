@@ -23,7 +23,7 @@ export const generateInvoice = (sale, settings) => {
   doc.text(`Invoice No: ${invoiceNo}`, 196, 20, { align: "right" });
   doc.text(`Date: ${date}`, 196, 26, { align: "right" });
 
-  // Shop Details (Seller) — address, state + pin, phone + gstin, email
+  // Shop Details (Seller)
   doc.setTextColor(80, 80, 80);
   doc.setFontSize(9);
   doc.text(settings.shop_address || "", 14, 45);
@@ -74,20 +74,43 @@ export const generateInvoice = (sale, settings) => {
   const cgst = taxableValue * 0.09;
   const sgst = taxableValue * 0.09;
 
+  // Build items array (support both new multi-item and legacy single-item)
+  let items = [];
+  if (sale.items && sale.items.length > 0) {
+    items = sale.items.map((i, idx) => ({
+      idx: idx + 1,
+      desc: `${i.battery_brand} ${i.battery_model}\nS/N: ${i.serial_number || "N/A"}`,
+      hsn: i.hsn_code || "85071000",
+      rate: ((i.mrp || 0) * (i.quantity || 1)) / 1.18,
+      qty: i.quantity || 1,
+      amount: ((i.mrp || 0) * (i.quantity || 1)) / 1.18,
+    }));
+  } else {
+    // Legacy single-item sale
+    items = [
+      {
+        idx: 1,
+        desc: `${sale.battery_brand} ${sale.battery_model}\nS/N: ${sale.serial_number || "N/A"}`,
+        hsn: sale.hsn_code || "85071000",
+        rate: taxableValue,
+        qty: 1,
+        amount: taxableValue,
+      },
+    ];
+  }
+
   // Items Table (Monospace for numbers)
   autoTable(doc, {
     startY: 115,
     head: [["#", "Description of Goods", "HSN", "Rate", "Qty", "Amount"]],
-    body: [
-      [
-        "1",
-        `${sale.battery_brand} ${sale.battery_model}\nS/N: ${sale.serial_number || "N/A"}`,
-        sale.hsn_code || "85071000",
-        taxableValue.toFixed(2),
-        "1",
-        taxableValue.toFixed(2),
-      ],
-    ],
+    body: items.map((i) => [
+      i.idx.toString(),
+      i.desc,
+      i.hsn,
+      i.rate.toFixed(2),
+      i.qty.toString(),
+      i.amount.toFixed(2),
+    ]),
     theme: "grid",
     headStyles: {
       fillColor: [245, 245, 245],
