@@ -153,6 +153,23 @@ export default function Sales({ isAdmin }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+
+    // Check serial number uniqueness (skip if blank or editing the same record)
+    if (form.serial_number && form.serial_number.trim()) {
+      const { data: existing } = await supabase
+        .from("sales")
+        .select("id")
+        .eq("serial_number", form.serial_number.trim())
+        .neq("id", editingItem?.id || "00000000-0000-0000-0000-000000000000")
+        .limit(1);
+      if (existing && existing.length > 0) {
+        alert(
+          "Serial number already used in another sale. Each battery must have a unique serial number.",
+        );
+        return;
+      }
+    }
+
     const mrp = parseFloat(form.mrp) || 0;
     const discountVal = parseFloat(form.discount) || 0;
     const discountAmount =
@@ -223,7 +240,10 @@ export default function Sales({ isAdmin }) {
           item.phone?.toLowerCase().includes(search.toLowerCase()) ||
           item.vehicle_number?.toLowerCase().includes(search.toLowerCase()) ||
           item.battery_brand?.toLowerCase().includes(search.toLowerCase()) ||
-          item.battery_model?.toLowerCase().includes(search.toLowerCase())),
+          item.battery_model?.toLowerCase().includes(search.toLowerCase()) ||
+          `INV-${item.id?.substring(0, 8).toUpperCase()}`
+            .toLowerCase()
+            .includes(search.toLowerCase())),
     );
 
     if (sort === "price-high")
