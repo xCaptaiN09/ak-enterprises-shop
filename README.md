@@ -1,6 +1,6 @@
-# 🔋 Illath Battery House CRM
+# 🔋 AK Enterprises CRM
 
-A premium, minimalistic, and highly secure internal CRM designed specifically for **Illath Battery House**.
+A premium, minimalistic, and highly secure internal CRM designed specifically for **AK Enterprises**.
 This application streamlines the tracking of battery sales, service tickets, and inventory management.
 
 ![Tech Stack](https://img.shields.io/badge/Stack-React%20%2B%20Supabase%20%2B%20Tailwind-black?style=for-the-badge&logo=react)
@@ -29,8 +29,8 @@ This application streamlines the tracking of battery sales, service tickets, and
 
 1. Clone the repository:
    ```bash
-   git clone https://github.com/xCaptaiN09/illath-battery-crm.git
-   cd illath-battery-crm
+   git clone https://github.com/xCaptaiN09/ak-enterprises-shop.git
+   cd ak-enterprises-shop
    ```
 2. Install dependencies:
    ```bash
