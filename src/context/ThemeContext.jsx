@@ -4,35 +4,27 @@ const ThemeContext = createContext();
 
 export function ThemeProvider({ children }) {
   const [theme, setTheme] = useState(() => {
+    // Check if user has a saved preference, otherwise default to 'dark'
     const savedTheme = localStorage.getItem("theme");
     return savedTheme || "dark";
   });
-  const [glassMode, setGlassMode] = useState(() => {
-    const saved = localStorage.getItem("glassMode");
-    return saved === "true";
-  });
 
   useEffect(() => {
-    const root = document.documentElement;
-    if (theme === "dark") root.classList.add("dark");
-    else root.classList.remove("dark");
+    const root = document.documentElement; // This is the <html> tag
+    if (theme === "dark") {
+      root.classList.add("dark");
+    } else {
+      root.classList.remove("dark");
+    }
     localStorage.setItem("theme", theme);
   }, [theme]);
 
-  useEffect(() => {
-    const root = document.documentElement;
-    if (glassMode) root.classList.add("glass-mode");
-    else root.classList.remove("glass-mode");
-    localStorage.setItem("glassMode", glassMode);
-  }, [glassMode]);
-
-  const toggleTheme = () => setTheme(theme === "dark" ? "light" : "dark");
-  const toggleGlass = () => setGlassMode((g) => !g);
+  const toggleTheme = () => {
+    setTheme(theme === "dark" ? "light" : "dark");
+  };
 
   return (
-    <ThemeContext.Provider
-      value={{ theme, toggleTheme, glassMode, toggleGlass }}
-    >
+    <ThemeContext.Provider value={{ theme, toggleTheme }}>
       {children}
     </ThemeContext.Provider>
   );
