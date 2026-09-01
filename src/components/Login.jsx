@@ -1,11 +1,34 @@
 import { useState, useEffect } from "react";
 import { supabase } from "../supabaseClient";
 import { motion, AnimatePresence } from "framer-motion";
-import { Battery, UserPlus, LogIn, Sun, Moon } from "lucide-react";
+import { Battery, UserPlus, LogIn, Sun, Moon, Settings, X } from "lucide-react";
 import { useTheme } from "../context/ThemeContext";
 
 // Fallback shown only if the live name can't be fetched (e.g. offline).
 const FALLBACK_NAME = "Battery CRM";
+
+function Toggle({ checked, onChange, label }) {
+  return (
+    <div className="flex items-center justify-between py-3">
+      <span className="text-sm font-semibold text-zinc-900 dark:text-white">
+        {label}
+      </span>
+      <button
+        type="button"
+        onClick={onChange}
+        className={`relative w-11 h-6 rounded-full transition-colors ${
+          checked ? "bg-green-500" : "bg-zinc-300 dark:bg-zinc-700"
+        }`}
+      >
+        <span
+          className={`absolute top-0.5 left-0.5 w-5 h-5 rounded-full bg-white shadow-sm transition-transform ${
+            checked ? "translate-x-5" : ""
+          }`}
+        />
+      </button>
+    </div>
+  );
+}
 
 export default function Login() {
   const [email, setEmail] = useState("");
@@ -15,7 +38,8 @@ export default function Login() {
   const [mode, setMode] = useState("login");
   const [signupSuccess, setSignupSuccess] = useState(false);
   const [brandName, setBrandName] = useState(FALLBACK_NAME);
-  const { theme, toggleTheme } = useTheme();
+  const { theme, toggleTheme, glassMode, toggleGlass } = useTheme();
+  const [showSettings, setShowSettings] = useState(false);
 
   useEffect(() => {
     supabase
@@ -61,18 +85,59 @@ export default function Login() {
         {brandMark}
       </span>
 
-      {/* Theme toggle — same floating circular chip as the dashboard */}
       <button
-        onClick={toggleTheme}
-        aria-label="Toggle theme"
-        className="absolute top-5 right-5 z-20 w-10 h-10 rounded-full flex items-center justify-center bg-[var(--card)] border border-[var(--card-border)] shadow-sm text-zinc-900 dark:text-white transition-transform active:scale-95"
+        onClick={() => setShowSettings(true)}
+        aria-label="Settings"
+        className="absolute top-5 right-5 z-20 w-10 h-10 rounded-full flex items-center justify-center bg-[var(--card)] border border-[var(--card-border)] shadow-sm text-zinc-500 dark:text-zinc-400 transition-transform active:scale-95"
       >
-        {theme === "dark" ? (
-          <Sun className="w-5 h-5 text-amber-400" />
-        ) : (
-          <Moon className="w-5 h-5" />
-        )}
+        <Settings className="w-4 h-4" />
       </button>
+
+      {/* Login settings sheet */}
+      <AnimatePresence>
+        {showSettings && (
+          <>
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[70]"
+              onClick={() => setShowSettings(false)}
+            />
+            <motion.div
+              initial={{ y: "100%" }}
+              animate={{ y: 0 }}
+              exit={{ y: "100%" }}
+              transition={{ type: "spring", damping: 28, stiffness: 280 }}
+              className="fixed bottom-0 left-0 right-0 md:bottom-auto md:top-1/2 md:left-1/2 md:-translate-x-1/2 md:-translate-y-1/2 md:w-[420px] md:rounded-3xl bg-[var(--card)] md:rounded-none rounded-t-3xl shadow-2xl z-[80]"
+            >
+              <div className="px-5 pt-5 pb-3 flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800">
+                <h2 className="text-lg font-extrabold text-zinc-900 dark:text-white">
+                  Settings
+                </h2>
+                <button
+                  onClick={() => setShowSettings(false)}
+                  className="w-8 h-8 rounded-full flex items-center justify-center bg-zinc-100 dark:bg-zinc-800 text-zinc-500"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+              <div className="p-5">
+                <Toggle
+                  label="Dark Mode"
+                  checked={theme === "dark"}
+                  onChange={toggleTheme}
+                />
+                <Toggle
+                  label="Liquid Glass Theme"
+                  checked={glassMode}
+                  onChange={toggleGlass}
+                />
+              </div>
+            </motion.div>
+          </>
+        )}
+      </AnimatePresence>
 
       <motion.div
         initial={{ opacity: 0, y: 20 }}
